@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import './App.css'
 
@@ -24,8 +24,10 @@ function App() {
   const [questions, setQuestions] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState({});
+  const [incorrectAnswers, setIncorrectAnswers] = useState({});
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [testType, setTestType] = useState('');
   const [showResults, setShowResults] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -120,6 +122,21 @@ function App() {
     return () => clearInterval(timer);
   }, [isStarted, timeLeft]);
 
+  useEffect(() => {
+    setTimeout(() => {
+      const currentButton = document.querySelector(`.question-number:nth-child(${currentQuestionIndex + 1})`);
+      if (currentButton) {
+        const container = document.querySelector('.question-navigation');
+        if (container) {
+          const containerWidth = container.offsetWidth;
+          const buttonWidth = currentButton.offsetWidth;
+          const scrollLeft = currentButton.offsetLeft - (containerWidth / 2) + (buttonWidth / 2);
+          container.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' });
+        }
+      }
+    }, 100);
+  }, [currentQuestionIndex]);
+
   const startTest = (type) => {
     setTestType(type);
     setIsStarted(true);
@@ -128,10 +145,33 @@ function App() {
   };
 
   const handleAnswerSelect = (questionId, choiceId) => {
+    const currentQuestion = questions[currentQuestionIndex];
+    const selectedChoice = currentQuestion.choices.find(choice => choice.id === choiceId);
+    const isCorrect = selectedChoice.is_correct;
+
+    // Darhol javobni belgilash va rangini o'zgartirish
     setSelectedAnswers((prev) => ({
       ...prev,
       [questionId]: choiceId
     }));
+
+    if (!isCorrect) {
+      // Darhol noto'g'ri javobni belgilash
+      setIncorrectAnswers((prev) => ({
+        ...prev,
+        [questionId]: true
+      }));
+      const totalIncorrect = Object.keys(incorrectAnswers).length + 1;
+      setErrorMessage(`Xato javob! (${totalIncorrect} ta xato)`);
+      setTimeout(() => setErrorMessage(''), 2000);
+    }
+
+    // Faqat keyingi savolga o'tish uchun kechikish
+    setTimeout(() => {
+      if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(prev => prev + 1);
+      }
+    }, 2000);
   };
 
   const finishTest = () => {
@@ -180,7 +220,7 @@ function App() {
   const renderQuestion = (question) => {
     if (!question) return null;
 
-  return (
+    return (
       <div className="question">
         <h3>Savol {currentQuestionIndex + 1} / {questions.length}</h3>
         <p>{question.question_text}</p>
@@ -196,15 +236,26 @@ function App() {
           </div>
         )}
         <div className="choices">
-          {question.choices?.map((choice) => (
-            <button
-              key={choice.id}
-              className={`choice ${selectedAnswers[question.id] === choice.id ? 'selected' : ''}`}
-              onClick={() => handleAnswerSelect(question.id, choice.id)}
-            >
-              {choice.choice_text}
-            </button>
-          ))}
+          {question.choices?.map((choice) => {
+            const isSelected = selectedAnswers[question.id] === choice.id;
+            let className = 'choice';
+            
+            // Darhol to'g'ri yoki noto'g'ri javob rangini ko'rsatish
+            if (isSelected) {
+              className += choice.is_correct ? ' correct' : ' incorrect';
+            }
+            
+            return (
+              <button
+                key={choice.id}
+                className={className}
+                onClick={() => !selectedAnswers[question.id] && handleAnswerSelect(question.id, choice.id)}
+                disabled={selectedAnswers[question.id]}
+              >
+                {choice.choice_text}
+              </button>
+            );
+          })}
         </div>
       </div>
     );
@@ -246,7 +297,9 @@ function App() {
             key={index}
             className={`question-number ${
               selectedAnswers[questions[index]?.id] ? 'answered' : ''
-            } ${index === currentQuestionIndex ? 'current' : ''}`}
+            } ${incorrectAnswers[questions[index]?.id] ? 'incorrect' : ''} ${
+              index === currentQuestionIndex ? 'current' : ''
+            }`}
             onClick={() => setCurrentQuestionIndex(index)}
           >
             {index + 1}
@@ -255,6 +308,7 @@ function App() {
       </div>
       <div className="question-container">
         {renderQuestion(questions[currentQuestionIndex])}
+        {errorMessage && <div className="error-message">{errorMessage}</div>}
       </div>
       <div className="finish-button-container">
         <button 
@@ -274,57 +328,60 @@ function App() {
 
     return (
       <div className="results-screen">
-        <div className="results-header">
-          <h2>Test Natijalari</h2>
-        </div>
-        
-        <div className="results-progress">
-          <div 
-            className="progress-circle"
-            style={{ "--progress": `${percentage}%` }}
-          >
+        <div className="results-content">
+          <div className="results-header">
+            <h2>Test Natijalari</h2>
           </div>
-          <div className="progress-inner">
-            <div className="progress-value">{percentage}%</div>
-            <div className="progress-label">{isPassed ? "O'tdi" : "O'tmadi"}</div>
+          
+          <div className="results-progress">
+            <div 
+              className="progress-circle"
+              style={{ "--progress": `${percentage}%` }}
+            >
+              <div className="progress-inner">
+                <div className="progress-value">{percentage}%</div>
+                <div className="progress-label">{isPassed ? "O'tdi" : "O'tmadi"}</div>
+              </div>
+            </div>
           </div>
-        </div>
 
-        <div className="results-stats">
-          <div className="stat-card">
-            <div className="stat-value">{correctAnswers}</div>
-            <div className="stat-label">To'g'ri javoblar</div>
+          <div className="results-stats">
+            <div className="stat-card">
+              <div className="stat-value">{correctAnswers}</div>
+              <div className="stat-label">To'g'ri javoblar</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{questions.length - correctAnswers}</div>
+              <div className="stat-label">Noto'g'ri javoblar</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{questions.length}</div>
+              <div className="stat-label">Jami savollar</div>
+            </div>
           </div>
-          <div className="stat-card">
-            <div className="stat-value">{questions.length - correctAnswers}</div>
-            <div className="stat-label">Noto'g'ri javoblar</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{questions.length}</div>
-            <div className="stat-label">Jami savollar</div>
-          </div>
-        </div>
 
-        <div className="results-buttons">
-          <button 
-            className="result-button secondary"
-            onClick={() => setShowResults(false)}
-          >
-            Testga qaytish
-          </button>
-          <button 
-            className="result-button primary"
-            onClick={() => {
-              setIsStarted(false);
-              setShowResults(false);
-              setSelectedAnswers({});
-              setTimeLeft(25 * 60);
-              setCurrentQuestionIndex(0);
-              localStorage.removeItem('testState');
-            }}
-          >
-            Yangi test boshlash
-          </button>
+          <div className="results-buttons">
+            <button 
+              className="result-button secondary"
+              onClick={() => setShowResults(false)}
+            >
+              Testga qaytish
+            </button>
+            <button 
+              className="result-button primary"
+              onClick={() => {
+                setIsStarted(false);
+                setShowResults(false);
+                setSelectedAnswers({});
+                setIncorrectAnswers({});
+                setTimeLeft(25 * 60);
+                setCurrentQuestionIndex(0);
+                localStorage.removeItem('testState');
+              }}
+            >
+              Yangi test boshlash
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -360,6 +417,7 @@ function App() {
                   setIsStarted(false);
                   setShowExitConfirm(false);
                   setSelectedAnswers({});
+                  setIncorrectAnswers({});
                   setTimeLeft(25 * 60);
                   setCurrentQuestionIndex(0);
                   localStorage.removeItem('testState');

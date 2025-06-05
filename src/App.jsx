@@ -28,31 +28,84 @@ function App() {
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [testType, setTestType] = useState('');
   const [showResults, setShowResults] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Load saved state from localStorage
+  useEffect(() => {
+    const savedState = localStorage.getItem('testState');
+    if (savedState) {
+      const state = JSON.parse(savedState);
+      setIsStarted(state.isStarted);
+      setQuestions(state.questions);
+      setCurrentQuestionIndex(state.currentQuestionIndex);
+      setSelectedAnswers(state.selectedAnswers);
+      setTimeLeft(state.timeLeft);
+      setTestType(state.testType);
+      setShowResults(state.showResults);
+    }
+  }, []);
+
+  // Save state to localStorage whenever it changes
+  useEffect(() => {
+    if (isStarted) {
+      const state = {
+        isStarted,
+        questions,
+        currentQuestionIndex,
+        selectedAnswers,
+        timeLeft,
+        testType,
+        showResults
+      };
+      localStorage.setItem('testState', JSON.stringify(state));
+    }
+  }, [isStarted, questions, currentQuestionIndex, selectedAnswers, timeLeft, testType, showResults]);
 
   useEffect(() => {
     async function loadQuestions() {
-      const { data, error } = await supabase.from('questions').select('*');
-      if (error) {
-        console.error('Savollarni olishda xatolik:', error);
+      setLoading(true);
+      const { data: questionsData, error: qError } = await supabase.from('questions').select('*');
+      if (qError) {
+        console.error('Savollarni olishda xatolik:', qError);
+        setLoading(false);
         return;
       }
+      
       let selected = [];
-      if (data.length >= 20) {
-        // Random 20 ta savol tanlash (takrorlanmas)
-        const shuffled = data.sort(() => 0.5 - Math.random());
+      if (questionsData.length >= 20) {
+        const shuffled = shuffleArray(questionsData);
         selected = shuffled.slice(0, 20);
       } else {
-        // Kamida 20 ta bo'lishi uchun takrorlash
         while (selected.length < 20) {
-          const shuffled = data.sort(() => 0.5 - Math.random());
-          for (let i = 0; i < shuffled.length && selected.length < 20; i++) {
-            selected.push(shuffled[i]);
-          }
+          const shuffled = shuffleArray(questionsData);
+          selected.push(...shuffled.slice(0, 20 - selected.length));
         }
       }
-      setQuestions(selected);
+
+      const ids = selected.map(q => q.id);
+      const { data: allChoices, error: cError } = await supabase
+        .from('choices')
+        .select('*')
+        .in('question_id', ids);
+
+      if (cError) {
+        console.error('Javoblarni olishda xatolik:', cError);
+        setLoading(false);
+        return;
+      }
+
+      const questionsWithChoices = selected.map(q => ({
+        ...q,
+        choices: shuffleArray(allChoices.filter(c => c.question_id === q.id))
+      }));
+
+      setQuestions(questionsWithChoices);
+      setLoading(false);
     }
-    loadQuestions();
+
+    if (!questions.length) {
+      loadQuestions();
+    }
   }, []);
 
   useEffect(() => {
@@ -70,36 +123,28 @@ function App() {
   const startTest = (type) => {
     setTestType(type);
     setIsStarted(true);
+    // Clear previous test state
+    localStorage.removeItem('testState');
   };
 
-  const handleAnswerSelect = async (questionId, choiceId) => {
+  const handleAnswerSelect = (questionId, choiceId) => {
     setSelectedAnswers((prev) => ({
       ...prev,
       [questionId]: choiceId
     }));
-
-    if (testType === 'practice') {
-      const { data: choices } = await supabase
-        .from('choices')
-        .select('*')
-        .eq('question_id', questionId);
-      
-      const selectedChoice = choices.find(choice => choice.id === choiceId);
-      // Amaliyot rejimida har bir javobdan keyin natija ko'rsatiladi
-      // Bu yerda kerakli logikani qo'shishingiz mumkin
-    }
   };
 
   const finishTest = () => {
-    const { correctAnswers } = calculateResults();
     const unansweredQuestions = questions.filter(q => !selectedAnswers[q.id]).length;
     
     if (unansweredQuestions > 0) {
       if (confirm(`${unansweredQuestions} ta savol javobsiz qolgan. Testni yakunlashni xohlaysizmi?`)) {
         setShowResults(true);
+        localStorage.removeItem('testState');
       }
     } else {
       setShowResults(true);
+      localStorage.removeItem('testState');
     }
   };
 
@@ -108,35 +153,6 @@ function App() {
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
-
-  const renderChoices = async (questionId) => {
-    const { data: choices, error } = await supabase
-      .from('choices')
-      .select('*')
-      .eq('question_id', questionId);
-
-    if (error) {
-      console.error('Javoblarni olishda xatolik:', error);
-      return [];
-    }
-
-    return choices;
-  };
-
-  useEffect(() => {
-    if (questions[currentQuestionIndex]) {
-      renderChoices(questions[currentQuestionIndex].id).then(choices => {
-        setQuestions(prevQuestions => {
-          const newQuestions = [...prevQuestions];
-          newQuestions[currentQuestionIndex] = {
-            ...newQuestions[currentQuestionIndex],
-            choices
-          };
-          return newQuestions;
-        });
-      });
-    }
-  }, [currentQuestionIndex, questions[currentQuestionIndex]?.id]);
 
   const calculateResults = () => {
     let correctAnswers = 0;
@@ -162,16 +178,33 @@ function App() {
   };
 
   const renderQuestion = (question) => {
+    if (!question) return null;
+
   return (
       <div className="question">
-        <h3>Savol {currentQuestionIndex + 1}</h3>
+        <h3>Savol {currentQuestionIndex + 1} / {questions.length}</h3>
         <p>{question.question_text}</p>
-        <div className="question-image">
-          {question.image_url ? (
-            <img src={question.image_url} alt="Savol rasmi" />
-          ) : (
-            <img src={DEFAULT_QUESTION_IMAGE} alt="Default rasm" className="default-image" />
-          )}
+        {question.image_url && (
+          <div className="question-image">
+            <img 
+              src={question.image_url} 
+              alt="Savol rasmi"
+              onError={(e) => {
+                e.target.src = DEFAULT_QUESTION_IMAGE;
+              }}
+            />
+          </div>
+        )}
+        <div className="choices">
+          {question.choices?.map((choice) => (
+            <button
+              key={choice.id}
+              className={`choice ${selectedAnswers[question.id] === choice.id ? 'selected' : ''}`}
+              onClick={() => handleAnswerSelect(question.id, choice.id)}
+            >
+              {choice.choice_text}
+            </button>
+          ))}
         </div>
       </div>
     );
@@ -183,45 +216,77 @@ function App() {
       <div className="test-info">
         <h2>Test ma'lumotlari:</h2>
         <ul>
-          <li>Savollar soni: 20 ta</li>
-          <li>Vaqt: 25 daqiqa</li>
+          <li>20 ta savol</li>
+          <li>25 daqiqa vaqt</li>
           <li>O'tish bali: 18 ta to'g'ri javob</li>
-          <li>Har bir savol 1 balldan baholanadi</li>
         </ul>
       </div>
       <div className="test-type-buttons">
         <button 
-          className="test-type-button"
+          className="test-type-button" 
           onClick={() => startTest('practice')}
         >
-          <span>Amaliyot test</span>
-        </button>
-        <button 
-          className="test-type-button"
-          onClick={() => startTest('exam')}
-        >
-          <span>Yakuniy test</span>
+          Testni boshlash
         </button>
       </div>
     </div>
   );
 
+  const renderTestScreen = () => (
+    <>
+      <div className="header-controls">
+        <div className="timer">Vaqt: {formatTime(timeLeft)}</div>
+        <button className="exit-button" onClick={() => setShowExitConfirm(true)}>
+          Testdan chiqish
+        </button>
+      </div>
+      <div className="question-navigation">
+        {questions.map((_, index) => (
+          <button
+            key={index}
+            className={`question-number ${
+              selectedAnswers[questions[index]?.id] ? 'answered' : ''
+            } ${index === currentQuestionIndex ? 'current' : ''}`}
+            onClick={() => setCurrentQuestionIndex(index)}
+          >
+            {index + 1}
+          </button>
+        ))}
+      </div>
+      <div className="question-container">
+        {renderQuestion(questions[currentQuestionIndex])}
+      </div>
+      <div className="finish-button-container">
+        <button 
+          className="finish-button"
+          onClick={finishTest}
+        >
+          Testni yakunlash
+        </button>
+      </div>
+    </>
+  );
+
   const renderResults = () => {
     const { correctAnswers, results } = calculateResults();
-    const percentage = Math.round((correctAnswers / 20) * 100);
+    const percentage = Math.round((correctAnswers / questions.length) * 100);
     const isPassed = correctAnswers >= 18;
 
     return (
       <div className="results-screen">
         <div className="results-header">
           <h2>Test Natijalari</h2>
+        </div>
+        
+        <div className="results-progress">
           <div 
-            className="results-progress" 
-            style={{ "--progress": percentage }}
+            className="progress-circle"
+            style={{ "--progress": `${percentage}%` }}
           >
-            <div className="progress-circle">
-              <div className="progress-value">{percentage}%</div>
-            </div>
+          </div>
+          <div className="progress-inner">
+            <div className="progress-value">{percentage}%</div>
+            <div className="progress-label">{isPassed ? "O'tdi" : "O'tmadi"}</div>
           </div>
         </div>
 
@@ -231,58 +296,47 @@ function App() {
             <div className="stat-label">To'g'ri javoblar</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value">{20 - correctAnswers}</div>
+            <div className="stat-value">{questions.length - correctAnswers}</div>
             <div className="stat-label">Noto'g'ri javoblar</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value">{isPassed ? 'Otdi' : 'Otmadi'}</div>
-            <div className="stat-label">Natija</div>
-          </div>
-        </div>
-
-        <div className="results-details">
-          <h3>Batafsil natijalar:</h3>
-          <div className="results-list">
-            {results.map((result, index) => (
-              <div key={index} className="result-item">
-                <div className="result-number">{index + 1}</div>
-                <div className="result-question">{result.question}</div>
-                <div className={`result-status ${result.isCorrect ? 'status-correct' : 'status-incorrect'}`}>
-                  {result.isCorrect ? (
-                    <>✓ To'g'ri</>
-                  ) : (
-                    <>✗ Noto'g'ri</>
-                  )}
-                </div>
-              </div>
-            ))}
+            <div className="stat-value">{questions.length}</div>
+            <div className="stat-label">Jami savollar</div>
           </div>
         </div>
 
         <div className="results-buttons">
           <button 
-            className="result-button back-button"
+            className="result-button secondary"
             onClick={() => setShowResults(false)}
           >
             Testga qaytish
           </button>
           <button 
-            className="result-button restart-button"
-            onClick={() => window.location.reload()}
+            className="result-button primary"
+            onClick={() => {
+              setIsStarted(false);
+              setShowResults(false);
+              setSelectedAnswers({});
+              setTimeLeft(25 * 60);
+              setCurrentQuestionIndex(0);
+              localStorage.removeItem('testState');
+            }}
           >
-            Qayta boshlash
+            Yangi test boshlash
           </button>
         </div>
       </div>
     );
   };
 
-  if (!isStarted) {
-    return renderWelcomeScreen();
-  }
-
-  if (showResults) {
-    return renderResults();
+  if (loading) {
+    return (
+      <div className="loading">
+        <div className="spinner"></div>
+        <p>Yuklanmoqda...</p>
+      </div>
+    );
   }
 
   return (
@@ -292,93 +346,30 @@ function App() {
       ) : showResults ? (
         renderResults()
       ) : (
-        <>
-          <div className="main-container">
-            <div className="main-content">
-              <div className="question-navigation">
-                {questions.map((_, index) => (
-                  <button
-                    key={index}
-                    className={`question-number ${
-                      selectedAnswers[questions[index]?.id] ? 'answered' : ''
-                    } ${index === currentQuestionIndex ? 'current' : ''}`}
-                    onClick={() => setCurrentQuestionIndex(index)}
-                  >
-                    {index + 1}
-                  </button>
-                ))}
-              </div>
-
-              <div className="question-container">
-                {questions[currentQuestionIndex] && (
-                  <>
-                    <div className="question">
-                      <h3>Savol {currentQuestionIndex + 1}</h3>
-                      <p>{questions[currentQuestionIndex].question_text}</p>
-                    </div>
-
-                    <div className="choices">
-                      {questions[currentQuestionIndex].choices?.map((choice) => (
-                        <button
-                          key={choice.id}
-                          className={`choice ${
-                            selectedAnswers[questions[currentQuestionIndex].id] === choice.id
-                              ? 'selected'
-                              : ''
-                          }`}
-                          onClick={() => handleAnswerSelect(
-                            questions[currentQuestionIndex].id,
-                            choice.id
-                          )}
-                        >
-                          {choice.choice_text}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="image-section">
-            <div className="image-container">
-              {questions[currentQuestionIndex]?.image_url ? (
-                <img 
-                  src={questions[currentQuestionIndex].image_url}
-                  alt="Savol rasmi"
-                  className="question-image"
-                />
-              ) : (
-                <div className="image-placeholder">
-                  Rasm mavjud emas
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="header-controls">
-            <div className="timer">Qolgan vaqt: {formatTime(timeLeft)}</div>
-            <button className="exit-button" onClick={() => setShowExitConfirm(true)}>
-              Chiqish
-            </button>
-          </div>
-
-          <div className="footer">
-            <button className="finish-button" onClick={finishTest}>
-              Testni yakunlash
-            </button>
-          </div>
-        </>
+        renderTestScreen()
       )}
-      
+
       {showExitConfirm && (
         <div className="modal">
           <div className="modal-content">
             <h3>Testdan chiqishni xohlaysizmi?</h3>
+            <p>Barcha javoblaringiz o'chiriladi.</p>
             <div className="modal-buttons">
-              <button onClick={() => window.location.reload()}>Ha</button>
-              <button onClick={() => setShowExitConfirm(false)}>Yo'q</button>
+              <button
+                onClick={() => {
+                  setIsStarted(false);
+                  setShowExitConfirm(false);
+                  setSelectedAnswers({});
+                  setTimeLeft(25 * 60);
+                  setCurrentQuestionIndex(0);
+                  localStorage.removeItem('testState');
+                }}
+              >
+                Ha, chiqish
+              </button>
+              <button onClick={() => setShowExitConfirm(false)}>
+                Yo'q, davom etish
+              </button>
             </div>
           </div>
         </div>

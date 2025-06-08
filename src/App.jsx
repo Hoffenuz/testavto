@@ -144,19 +144,37 @@ function App() {
     localStorage.removeItem('testState');
   };
 
+  const findNextUnansweredQuestion = (currentIndex) => {
+    let nextIndex = currentIndex + 1;
+    while (nextIndex < questions.length) {
+      if (!selectedAnswers[questions[nextIndex].id]) {
+        return nextIndex;
+      }
+      nextIndex++;
+    }
+    // Agar keyingi savollardan topilmasa, oldingi savollardan qidirish
+    nextIndex = 0;
+    while (nextIndex < currentIndex) {
+      if (!selectedAnswers[questions[nextIndex].id]) {
+        return nextIndex;
+      }
+      nextIndex++;
+    }
+    return currentIndex; // Agar hech qaysi topilmasa, hozirgi savolda qolish
+  };
+
   const handleAnswerSelect = (questionId, choiceId) => {
     const currentQuestion = questions[currentQuestionIndex];
     const selectedChoice = currentQuestion.choices.find(choice => choice.id === choiceId);
     const isCorrect = selectedChoice.is_correct;
 
-    // Darhol javobni belgilash va rangini o'zgartirish
+    // Darhol javobni belgilash
     setSelectedAnswers((prev) => ({
       ...prev,
       [questionId]: choiceId
     }));
 
     if (!isCorrect) {
-      // Darhol noto'g'ri javobni belgilash
       setIncorrectAnswers((prev) => ({
         ...prev,
         [questionId]: true
@@ -166,11 +184,10 @@ function App() {
       setTimeout(() => setErrorMessage(''), 2000);
     }
 
-    // Faqat keyingi savolga o'tish uchun kechikish
+    // Keyingi belgilanmagan savolga o'tish
     setTimeout(() => {
-      if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex(prev => prev + 1);
-      }
+      const nextQuestionIndex = findNextUnansweredQuestion(currentQuestionIndex);
+      setCurrentQuestionIndex(nextQuestionIndex);
     }, 2000);
   };
 
@@ -240,7 +257,6 @@ function App() {
             const isSelected = selectedAnswers[question.id] === choice.id;
             let className = 'choice';
             
-            // Darhol to'g'ri yoki noto'g'ri javob rangini ko'rsatish
             if (isSelected) {
               className += choice.is_correct ? ' correct' : ' incorrect';
             }

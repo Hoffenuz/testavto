@@ -502,24 +502,42 @@ body {
 
 /* Har bir tugma */
 .test-type-button {
-  padding: 1.25rem 2rem;
+  background: rgb(0, 255, 42);
   border: none;
-  border-radius: var(--border-radius);
-  background: var(--success-color);
-  color: rgb(223, 22, 22);
+  border-radius: 15px;
+  padding: 20px;
+  width: 250px;
   cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  text-decoration: none;
+  color: #ffffff;
+  justify-content: center;
+  align-items: center;
   font-size: 1.2rem;
   font-weight: 600;
-  transition: all 0.2s ease;
-  text-align: center;
-  width: 100%;
-  max-width: 300px;
-  box-shadow: var(--shadow);
+}
+
+.test-type-button.home-button {
+  background: var(--primary-color);
+  color: rgb(255, 255, 255);
+  margin-top: 1rem;
 }
 
 .test-type-button:hover {
-  background: var(--success-hover);
-  transform: translateY(-2px);
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.test-type-button.practice {
+  border-bottom: 4px solid #4299e1;
+}
+
+.test-type-button.final {
+  border-bottom: 4px solid #4dc27e;
 }
 
 /* Natijalar ekrani */
@@ -627,6 +645,11 @@ body {
   text-align: center;
   transition: all 0.3s ease;
   box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
 }
 
 .stat-card:hover {
@@ -639,13 +662,28 @@ body {
   font-weight: bold;
   color: var(--primary-color);
   margin-bottom: 1rem;
-  line-height: 1;
+  line-height: 1.2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stat-value.time {
+  font-size: 2rem;
+}
+
+.stat-value.time span {
+  font-size: 1.5rem;
+  color: var(--text-color);
+  opacity: 0.8;
 }
 
 .stat-label {
   color: var(--text-color);
   font-size: 1.1rem;
   font-weight: 500;
+  text-align: center;
 }
 
 .results-buttons {
@@ -665,6 +703,9 @@ body {
   cursor: pointer;
   transition: all 0.2s ease;
   min-width: 200px;
+  text-decoration: none;
+  text-align: center;
+  display: inline-block;
 }
 
 .result-button.primary {
@@ -683,6 +724,16 @@ body {
 }
 
 .result-button.secondary:hover {
+  background: var(--primary-hover);
+  transform: translateY(-2px);
+}
+
+.result-button.home {
+  background: var(--primary-color);
+  color: white;
+}
+
+.result-button.home:hover {
   background: var(--primary-hover);
   transform: translateY(-2px);
 }
@@ -794,10 +845,19 @@ body {
 
   .stat-card {
     padding: 1.5rem;
+    min-height: 140px;
   }
 
   .stat-value {
     font-size: 2rem;
+  }
+
+  .stat-value.time {
+    font-size: 1.75rem;
+  }
+
+  .stat-value.time span {
+    font-size: 1.25rem;
   }
 
   .results-buttons {
@@ -843,6 +903,12 @@ body {
     min-width: 28px;
     font-size: 0.85rem;
   }
+
+  .test-type-button {
+    width: 100%;
+    padding: 15px;
+    font-size: 1.1rem;
+  }
 }
 
 /* Animatsiyalar */
@@ -866,44 +932,6 @@ body {
 .test-type-selection {
   margin: 2rem 0;
   text-align: center;
-}
-
-.test-type-button {
-  background: white;
-  border: none;
-  border-radius: 15px;
-  padding: 20px;
-  width: 250px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-}
-
-.test-type-button:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-}
-
-.test-type-button span {
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: #2d3748;
-}
-
-.test-type-button small {
-  color: #718096;
-  font-size: 0.9rem;
-}
-
-.test-type-button.practice {
-  border-bottom: 4px solid #4299e1;
-}
-
-.test-type-button.final {
-  border-bottom: 4px solid #48bb78;
 }
 
 .answers-review {

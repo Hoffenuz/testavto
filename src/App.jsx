@@ -31,6 +31,8 @@ function App() {
   const [testType, setTestType] = useState('');
   const [showResults, setShowResults] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [startTime, setStartTime] = useState(null);
+  const [timeSpent, setTimeSpent] = useState(0);
 
   // Load saved state from localStorage
   useEffect(() => {
@@ -140,7 +142,12 @@ function App() {
   const startTest = (type) => {
     setTestType(type);
     setIsStarted(true);
-    // Clear previous test state
+    setStartTime(Date.now());
+    setTimeSpent(0);
+    setSelectedAnswers({});
+    setIncorrectAnswers({});
+    setTimeLeft(25 * 60);
+    setCurrentQuestionIndex(0);
     localStorage.removeItem('testState');
   };
 
@@ -160,7 +167,7 @@ function App() {
       }
       nextIndex++;
     }
-    return currentIndex; // Agar hech qaysi topilmasa, hozirgi savolda qolish
+    return -1; // Barcha savollar belgilangan
   };
 
   const handleAnswerSelect = (questionId, choiceId) => {
@@ -168,7 +175,6 @@ function App() {
     const selectedChoice = currentQuestion.choices.find(choice => choice.id === choiceId);
     const isCorrect = selectedChoice.is_correct;
 
-    // Darhol javobni belgilash
     setSelectedAnswers((prev) => ({
       ...prev,
       [questionId]: choiceId
@@ -184,10 +190,13 @@ function App() {
       setTimeout(() => setErrorMessage(''), 2000);
     }
 
-    // Keyingi belgilanmagan savolga o'tish
     setTimeout(() => {
       const nextQuestionIndex = findNextUnansweredQuestion(currentQuestionIndex);
-      setCurrentQuestionIndex(nextQuestionIndex);
+      if (nextQuestionIndex === -1) {
+        setShowResults(true);
+      } else {
+        setCurrentQuestionIndex(nextQuestionIndex);
+      }
     }, 2000);
   };
 
@@ -209,6 +218,13 @@ function App() {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const formatTimeSpent = (totalSeconds) => {
+    if (!totalSeconds) return { minutes: 0, seconds: 0 };
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return { minutes, seconds };
   };
 
   const calculateResults = () => {
@@ -295,6 +311,14 @@ function App() {
         >
           Testni boshlash
         </button>
+        <a 
+          href="https://urren.netlify.app" 
+          className="test-type-button home-button"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Bosh sahifa
+        </a>
       </div>
     </div>
   );
@@ -371,10 +395,11 @@ function App() {
               <div className="stat-label">Noto'g'ri javoblar</div>
             </div>
             <div className="stat-card">
-              <div className="stat-value">{questions.length}</div>
-              <div className="stat-label">Jami savollar</div>
+              <div className="stat-value">20</div>
+              <div className="stat-label">Umumiy savollar</div>
             </div>
           </div>
+          
 
           <div className="results-buttons">
             <button 
@@ -392,11 +417,21 @@ function App() {
                 setIncorrectAnswers({});
                 setTimeLeft(25 * 60);
                 setCurrentQuestionIndex(0);
+                setStartTime(null);
+                setTimeSpent(0);
                 localStorage.removeItem('testState');
               }}
             >
               Yangi test boshlash
             </button>
+            <a 
+              href="https://urren.netlify.app" 
+              className="result-button home"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Bosh sahifaga qaytish
+            </a>
           </div>
         </div>
       </div>

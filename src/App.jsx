@@ -254,17 +254,18 @@ function App() {
     if (!question) return null;
 
     return (
-      <div className="question">
+      <div className="question" key={question.id}>
         <h3>Savol {currentQuestionIndex + 1} / {questions.length}</h3>
         <p>{question.question_text}</p>
         {question.image_url && (
-          <div className="question-image">
+          <div className="question-image" key={question.id}>
             <img 
               src={question.image_url} 
               alt="Savol rasmi"
               onError={(e) => {
                 e.target.src = DEFAULT_QUESTION_IMAGE;
               }}
+              loading="eager"
             />
           </div>
         )}
@@ -312,7 +313,7 @@ function App() {
           Testni boshlash
         </button>
         <a 
-          href="https://urren.netlify.app" 
+          href="https://tests.avtotestu.uz" 
           className="test-type-button home-button"
           target="_blank"
           rel="noopener noreferrer"
@@ -425,7 +426,7 @@ function App() {
               Yangi test boshlash
             </button>
             <a 
-              href="https://urren.netlify.app" 
+              href="https://tests.avtotestu.uz" 
               className="result-button home"
               target="_blank"
               rel="noopener noreferrer"

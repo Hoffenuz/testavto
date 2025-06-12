@@ -313,7 +313,7 @@ function App() {
           Testni boshlash
         </button>
         <a 
-          href="https://tests.avtotestu.uz" 
+          href="https://avtotestu.uz" 
           className="test-type-button home-button"
           target="_blank"
           rel="noopener noreferrer"

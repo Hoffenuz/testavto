@@ -426,7 +426,7 @@ function App() {
               Yangi test boshlash
             </button>
             <a 
-              href="https://tests.avtotestu.uz" 
+              href="https://avtotestu.uz" 
               className="result-button home"
               target="_blank"
               rel="noopener noreferrer"

@@ -158,6 +158,7 @@ function App() {
   }, [currentQuestionIndex]);
 
   const startTest = (type) => {
+    // Clear all previous test data
     setTestType(type);
     setIsStarted(true);
     setStartTime(Date.now());
@@ -166,7 +167,53 @@ function App() {
     setIncorrectAnswers({});
     setTimeLeft(25 * 60);
     setCurrentQuestionIndex(0);
+    setShowResults(false);
+    // Clear localStorage before starting new test
     localStorage.removeItem('testState');
+    
+    // Load fresh questions
+    loadQuestions();
+  };
+
+  const loadQuestions = async () => {
+    setLoading(true);
+    const { data: questionsData, error: qError } = await supabase.from('questions').select('*');
+    if (qError) {
+      console.error('Savollarni olishda xatolik:', qError);
+      setLoading(false);
+      return;
+    }
+    
+    let selected = [];
+    if (questionsData.length >= 20) {
+      const shuffled = shuffleArray(questionsData);
+      selected = shuffled.slice(0, 20);
+    } else {
+      while (selected.length < 20) {
+        const shuffled = shuffleArray(questionsData);
+        selected.push(...shuffled.slice(0, 20 - selected.length));
+      }
+    }
+
+    const ids = selected.map(q => q.id);
+    const { data: allChoices, error: cError } = await supabase
+      .from('choices')
+      .select('*')
+      .in('question_id', ids);
+
+    if (cError) {
+      console.error('Javoblarni olishda xatolik:', cError);
+      setLoading(false);
+      return;
+    }
+
+    const questionsWithChoices = selected.map(q => ({
+      ...q,
+      choices: shuffleArray(allChoices.filter(c => c.question_id === q.id))
+    }));
+
+    setQuestions(questionsWithChoices);
+    setLoading(false);
   };
 
   const findNextUnansweredQuestion = (currentIndex) => {
@@ -340,7 +387,7 @@ function App() {
           Testni boshlash
         </button>
         <a 
-          href="https://tests.avtotestu.uz" 
+          href="https://www.avtotestu.uz" 
           className="test-type-button home-button"
           target="_blank"
           rel="noopener noreferrer"
@@ -432,7 +479,10 @@ function App() {
           <div className="results-buttons">
             <button 
               className="result-button secondary"
-              onClick={() => setShowResults(false)}
+              onClick={() => {
+                setShowResults(false);
+                setCurrentQuestionIndex(0);
+              }}
             >
               Testga qaytish
             </button>
@@ -447,13 +497,14 @@ function App() {
                 setCurrentQuestionIndex(0);
                 setStartTime(null);
                 setTimeSpent(0);
+                setQuestions([]);
                 localStorage.removeItem('testState');
               }}
             >
               Yangi test boshlash
             </button>
             <a 
-              href="https://tests.avtotestu.uz" 
+              href="https://www.avtotestu.uz" 
               className="result-button home"
               target="_blank"
               rel="noopener noreferrer"
@@ -465,6 +516,43 @@ function App() {
       </div>
     );
   };
+
+  const renderExitConfirm = () => (
+    <div className="modal-overlay" onClick={() => setShowExitConfirm(false)}>
+      <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <div className="modal-icon">
+          <svg viewBox="0 0 24 24" width="32" height="32">
+            <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+          </svg>
+        </div>
+        <h3>Testni yakunlamoqchimisiz?</h3>
+        <p>Barcha javoblaringiz o'chiriladi va test qaytadan boshlanadi.</p>
+        <div className="modal-buttons">
+          <button
+            className="modal-button confirm"
+            onClick={() => {
+              setIsStarted(false);
+              setShowExitConfirm(false);
+              setSelectedAnswers({});
+              setIncorrectAnswers({});
+              setTimeLeft(25 * 60);
+              setCurrentQuestionIndex(0);
+              setQuestions([]);
+              localStorage.removeItem('testState');
+            }}
+          >
+            Ha, yakunlash
+          </button>
+          <button 
+            className="modal-button cancel"
+            onClick={() => setShowExitConfirm(false)}
+          >
+            Yo'q, davom etish
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -485,41 +573,7 @@ function App() {
         renderTestScreen()
       )}
 
-      {showExitConfirm && (
-        <div className="modal-overlay" onClick={() => setShowExitConfirm(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-icon">
-              <svg viewBox="0 0 24 24" width="32" height="32">
-                <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-              </svg>
-            </div>
-            <h3>Testni yakunlamoqchimisiz?</h3>
-            <p>Barcha javoblaringiz o'chiriladi va test qaytadan boshlanadi.</p>
-            <div className="modal-buttons">
-              <button
-                className="modal-button confirm"
-                onClick={() => {
-                  setIsStarted(false);
-                  setShowExitConfirm(false);
-                  setSelectedAnswers({});
-                  setIncorrectAnswers({});
-                  setTimeLeft(25 * 60);
-                  setCurrentQuestionIndex(0);
-                  localStorage.removeItem('testState');
-                }}
-              >
-                Ha, yakunlash
-              </button>
-              <button 
-                className="modal-button cancel"
-                onClick={() => setShowExitConfirm(false)}
-              >
-                Yo'q, davom etish
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showExitConfirm && renderExitConfirm()}
     </div>
   );
 }

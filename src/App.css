@@ -373,51 +373,91 @@ body {
   background: var(--success-hover);
 }
 
-.modal {
+.modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.7);
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
   z-index: 1000;
+  backdrop-filter: blur(4px);
 }
 
 .modal-content {
   background: white;
   padding: 2rem;
-  border-radius: var(--border-radius);
-  max-width: 90%;
-  width: 400px;
+  border-radius: 12px;
+  max-width: 400px;
+  width: 90%;
   text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  animation: modalFadeIn 0.3s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-icon {
+  margin-bottom: 1rem;
+  color: #e74c3c;
+}
+
+.modal-content h3 {
+  color: #245586;
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+}
+
+.modal-content p {
+  color: #666;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
 }
 
 .modal-buttons {
   display: flex;
   gap: 1rem;
   justify-content: center;
-  margin-top: 1.5rem;
 }
 
-.modal-buttons button {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: var(--border-radius);
-  cursor: pointer;
-  font-size: 1rem;
+.modal-button {
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  min-width: 120px;
 }
 
-.modal-buttons button:first-child {
-  background: #ef4444;
+.modal-button.confirm {
+  background-color: #e74c3c;
   color: white;
+  border: none;
 }
 
-.modal-buttons button:last-child {
-  background: #e2e8f0;
-  color: var(--text-color);
+.modal-button.confirm:hover {
+  background-color: #c0392b;
+}
+
+.modal-button.cancel {
+  background-color: #ecf0f1;
+  color: #2c3e50;
+  border: 1px solid #bdc3c7;
+}
+
+.modal-button.cancel:hover {
+  background-color: #bdc3c7;
 }
 
 /* Welcome screen - Test tanlash qismi */
@@ -514,27 +554,29 @@ body {
 
 /* Har bir tugma */
 .test-type-button {
-  background: rgb(0, 255, 42);
-  border: none;
-  border-radius: 8px;
-  padding: 0.8rem;
-  width: 100%;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 1rem;
-  font-weight: 500;
+  background: linear-gradient(135deg, #00b84a, #02b53e);
   color: white;
-  text-align: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.test-type-button.home-button {
-  background: var(--primary-color);
+  padding: 1rem 2rem;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(6, 121, 35, 0.3);
+  text-decoration: none;
+  display: inline-block;
+  margin: 0.5rem;
 }
 
 .test-type-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 6px 20px rgba(2, 96, 55, 0.4);
+  background: linear-gradient(135deg, #00a884, #009874);
+}
+
+.test-type-button.home-button {
+  background: var(--primary-color);
 }
 
 .test-type-button.practice {

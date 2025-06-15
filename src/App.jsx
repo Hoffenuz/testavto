@@ -46,6 +46,7 @@ function App() {
       setTimeLeft(state.timeLeft);
       setTestType(state.testType);
       setShowResults(state.showResults);
+      setIncorrectAnswers(state.incorrectAnswers || {});
     }
   }, []);
 
@@ -59,15 +60,29 @@ function App() {
         selectedAnswers,
         timeLeft,
         testType,
-        showResults
+        showResults,
+        incorrectAnswers
       };
       localStorage.setItem('testState', JSON.stringify(state));
     }
-  }, [isStarted, questions, currentQuestionIndex, selectedAnswers, timeLeft, testType, showResults]);
+  }, [isStarted, questions, currentQuestionIndex, selectedAnswers, timeLeft, testType, showResults, incorrectAnswers]);
 
   useEffect(() => {
     async function loadQuestions() {
       setLoading(true);
+      
+      // Check if we have saved questions in localStorage
+      const savedState = localStorage.getItem('testState');
+      if (savedState) {
+        const state = JSON.parse(savedState);
+        if (state.questions && state.questions.length > 0) {
+          setQuestions(state.questions);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // If no saved questions, load new ones
       const { data: questionsData, error: qError } = await supabase.from('questions').select('*');
       if (qError) {
         console.error('Savollarni olishda xatolik:', qError);
@@ -107,19 +122,22 @@ function App() {
       setLoading(false);
     }
 
-    if (!questions.length) {
-      loadQuestions();
-    }
+    loadQuestions();
   }, []);
 
   useEffect(() => {
     let timer;
     if (isStarted && timeLeft > 0 && !showResults) {
       timer = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            finishTest(true); // Pass true to indicate automatic completion
+            return 0;
+          }
+          return prev - 1;
+        });
       }, 1000);
-    } else if (timeLeft === 0) {
-      finishTest();
     }
     return () => clearInterval(timer);
   }, [isStarted, timeLeft]);
@@ -200,17 +218,26 @@ function App() {
     }, 2000);
   };
 
-  const finishTest = () => {
+  const finishTest = (isAutomatic = false) => {
     const unansweredQuestions = questions.filter(q => !selectedAnswers[q.id]).length;
     
-    if (unansweredQuestions > 0) {
-      if (confirm(`${unansweredQuestions} ta savol javobsiz qolgan. Testni yakunlashni xohlaysizmi?`)) {
-        setShowResults(true);
-        localStorage.removeItem('testState');
-      }
-    } else {
+    if (isAutomatic) {
+      // For automatic completion, just show results without confirmation
       setShowResults(true);
       localStorage.removeItem('testState');
+    } else {
+      // For manual completion, show confirmation dialog
+      if (unansweredQuestions > 0) {
+        if (window.confirm(`${unansweredQuestions} ta savol javobsiz qolgan. Testni yakunlashni xohlaysizmi?`)) {
+          setShowResults(true);
+          localStorage.removeItem('testState');
+        }
+      } else {
+        if (window.confirm("Barcha savollarga javob berdingiz. Testni yakunlashni xohlaysizmi?")) {
+          setShowResults(true);
+          localStorage.removeItem('testState');
+        }
+      }
     }
   };
 
@@ -313,7 +340,7 @@ function App() {
           Testni boshlash
         </button>
         <a 
-          href="https://avtotestu.uz" 
+          href="https://tests.avtotestu.uz" 
           className="test-type-button home-button"
           target="_blank"
           rel="noopener noreferrer"
@@ -354,7 +381,7 @@ function App() {
       <div className="finish-button-container">
         <button 
           className="finish-button"
-          onClick={finishTest}
+          onClick={() => finishTest()}
         >
           Testni yakunlash
         </button>
@@ -426,7 +453,7 @@ function App() {
               Yangi test boshlash
             </button>
             <a 
-              href="https://avtotestu.uz" 
+              href="https://tests.avtotestu.uz" 
               className="result-button home"
               target="_blank"
               rel="noopener noreferrer"
@@ -459,12 +486,18 @@ function App() {
       )}
 
       {showExitConfirm && (
-        <div className="modal">
-          <div className="modal-content">
-            <h3>Testdan chiqishni xohlaysizmi?</h3>
-            <p>Barcha javoblaringiz o'chiriladi.</p>
+        <div className="modal-overlay" onClick={() => setShowExitConfirm(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-icon">
+              <svg viewBox="0 0 24 24" width="32" height="32">
+                <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+              </svg>
+            </div>
+            <h3>Testni yakunlamoqchimisiz?</h3>
+            <p>Barcha javoblaringiz o'chiriladi va test qaytadan boshlanadi.</p>
             <div className="modal-buttons">
               <button
+                className="modal-button confirm"
                 onClick={() => {
                   setIsStarted(false);
                   setShowExitConfirm(false);
@@ -475,9 +508,12 @@ function App() {
                   localStorage.removeItem('testState');
                 }}
               >
-                Ha, chiqish
+                Ha, yakunlash
               </button>
-              <button onClick={() => setShowExitConfirm(false)}>
+              <button 
+                className="modal-button cancel"
+                onClick={() => setShowExitConfirm(false)}
+              >
                 Yo'q, davom etish
               </button>
             </div>
